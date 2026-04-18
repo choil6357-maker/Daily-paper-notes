@@ -63,4 +63,4 @@ D'_i = \sum_{j \in \mathcal{N}(i)} \omega_{ij}(\alpha_{ij} S_j + \beta_{ij})
 ---
 
 ## 5. 적용 포인트
- - bilateral filter 방식의 propagation 필터를 hypernetwork mlp로 학습하는 컨셉
+ - source와 target의 pixel, 거리를 입력으로 받아 filtering 하는 affine 계수를 학습. 즉, bilateral filter의 컨셉(pixel차이와 distance weight)으로 propagation 필터를 hypernetwork mlp로 학습하는 방법
