@@ -1,7 +1,7 @@
 # ViPE: Video Pose Engine for 3D Geometric Perception
 
-- **학회:** NVIDIA Research Whitepapers / arXiv:2508.10934, 2025  
-  - 정식 학회 발표 논문이라기보다는 NVIDIA Research whitepaper 및 arXiv technical report 형태로 공개됨.
+- **학회:** NVIDIA Research Whitepaper / arXiv technical report 형태로 공개된 것으로 보임  
+  - 정식 학회 발표 여부는 본문 기준으로 확인되지 않음.
 - **링크:** https://arxiv.org/abs/2508.10934  
   - Project Page: https://research.nvidia.com/labs/toronto-ai/vipe/
 - **코드:** https://github.com/nv-tlabs/vipe
@@ -81,39 +81,39 @@ ViPE는 전체 비디오를 모든 frame 기준으로 직접 최적화하지 않
 
 ViPE는 각 keyframe에 대해 다음 unknown을 최적화한다.
 
-- camera pose: \(T_i \in SE(3)\)
-- camera intrinsics: \(k\)
-- low-resolution depth map: \(D_i \in \mathbb{R}^{h \times w}\)
+- camera pose: `T_i in SE(3)`
+- camera intrinsics: `k`
+- low-resolution depth map: `D_i in R^(h x w)`
 
-전체 energy는 다음 세 항으로 구성된다.
+전체 energy는 다음 세 항으로 구성된다. 수식 깨짐을 방지하기 위해 아래는 LaTeX가 아니라 plain text로 적었다.
 
-\[
-e_{ViPE}
-=
-\sum_{(i,j) \in \mathcal{E}} e_{dense}
-+
-\sum_{(i,j) \in \mathcal{E}} e_{sparse}
-+
-\alpha \sum_{i \in \mathcal{V}} e_{depth}
-\]
+```text
+e_ViPE({T_i}, {D_i}, k)
+  = sum over edges (i,j) of e_dense(T_i, T_j, D_i, k)
+  + sum over edges (i,j) of e_sparse(T_i, T_j, D_i, k)
+  + alpha * sum over keyframes i of e_depth(D_i)
+```
 
 각 항의 의미는 다음과 같다.
 
-- \(e_{dense}\): dense optical flow 기반 reprojection consistency
-- \(e_{sparse}\): sparse keypoint track 기반 고해상도 localization constraint
-- \(e_{depth}\): monocular metric depth prior 기반 depth regularization
+- `e_dense`: dense optical flow 기반 reprojection consistency
+- `e_sparse`: sparse keypoint track 기반 고해상도 localization constraint
+- `e_depth`: monocular metric depth prior 기반 depth regularization
 
 최적화는 Gauss-Newton solver로 수행되며, sparse linear system은 COLAMD reordering을 사용해 효율적으로 푼다.
 
 #### 3. Dense flow constraint
 
-현재 pose와 depth로 frame \(i\)의 pixel을 frame \(j\)로 projection했을 때의 이동량과, flow network가 예측한 optical flow가 일치하도록 한다.
+현재 pose와 depth로 frame `i`의 pixel을 frame `j`로 projection했을 때의 이동량과, flow network가 예측한 optical flow가 일치하도록 한다.
 
 핵심 residual은 다음 형태이다.
 
-\[
-\Pi_k(T_j^{-1}T_i \circ \Pi_k^{-1}(D_i[u])) - u - F_{ij}[u]
-\]
+```text
+res_dense(u)
+  = project_k(T_j^-1 * T_i * unproject_k(u, D_i[u]))
+  - u
+  - F_ij[u]
+```
 
 이 항은 textureless region에서도 learned flow prior를 이용해 dense correspondence를 제공한다.
 
@@ -125,17 +125,24 @@ Dense flow는 low-resolution에서 동작하므로, 고해상도 이미지의 co
 - Lucas-Kanade tracker로 frame 간 feature를 추적한다.
 - sparse feature는 원본 high-resolution image에서 계산되므로 sub-pixel 수준의 localization 정보를 제공한다.
 
-초기 formulation은 sparse keypoint 위치에서 depth를 bilinear interpolation하는 방식이지만, Hessian 구조가 복잡해진다. 따라서 논문에서는 bilinear splatting을 사용해 sparse flow를 low-resolution grid에 누적하고, dense flow term과 유사한 형태로 변환한다.
+초기 formulation은 sparse keypoint 위치에서 depth를 bilinear interpolation하는 방식이다.
+
+```text
+res_sparse(p_i, p_j)
+  = project_k(T_j^-1 * T_i * unproject_k(p_i, Bilerp(D_i, p_i)))
+  - p_j
+```
+
+하지만 이 방식은 Hessian 구조가 복잡해진다. 따라서 논문에서는 bilinear splatting을 사용해 sparse flow를 low-resolution grid에 누적하고, dense flow term과 유사한 형태로 변환한다.
 
 #### 5. Depth regularization
 
 작은 camera motion이나 degenerate motion에서는 pose-depth ambiguity가 커진다. 이를 줄이기 위해 pretrained monocular metric depth estimator가 제공하는 depth를 prior로 사용한다.
 
-\[
-e_{depth}(D_i)
-=
-\sum_u m[u] \cdot \|D_i[u] - D_i^{prior}[u]\|^2
-\]
+```text
+e_depth(D_i)
+  = sum over pixels u of m[u] * |D_i[u] - D_i_prior[u]|^2
+```
 
 이 항은 다음 역할을 한다.
 
@@ -156,18 +163,18 @@ Intrinsics가 BA에서 업데이트되면, metric depth model의 prediction도 �
 3. SAM이 segmentation mask를 생성한다.
 4. 계산량을 줄이기 위해 일정 frame interval마다만 segmentation을 수행한다.
 5. XMem으로 mask를 frame sequence 전체에 propagate한다.
-6. dynamic mask를 반전해 static background mask \(M\)을 만든다.
-7. dense flow term의 weight map에 \(M\)을 곱하고, sparse point track 중 dynamic region에 있는 track은 제거한다.
+6. dynamic mask를 반전해 static background mask `M`을 만든다.
+7. dense flow term의 weight map에 `M`을 곱하고, sparse point track 중 dynamic region에 있는 track은 제거한다.
 
 #### 7. 다양한 camera model 지원
 
 ViPE는 radial camera formulation을 사용하여 다양한 camera model을 지원한다.
 
-- pinhole camera: \(q_k(\theta)=\tan\theta\)
+- pinhole camera: `q_k(theta) = tan(theta)`
 - wide-angle/fisheye camera: unified camera model 사용
 - 360° panorama: panorama를 6개 pinhole camera view(front/back/left/right/up/down)로 projection하여 처리
 
-Multi-camera rig의 경우 rig-to-camera transform \(T_v\)를 포함하도록 BA formulation을 확장한다.
+Multi-camera rig의 경우 rig-to-camera transform `T_v`를 포함하도록 BA formulation을 확장한다.
 
 #### 8. Post-processed dense depth alignment
 
@@ -175,34 +182,28 @@ BA에서 얻은 depth는 pose와 잘 맞지만 low-resolution이고 noisy할 수
 
 ViPE는 두 depth를 결합한다.
 
-1. video depth model로 high-resolution affine-invariant depth \(D_i^{VDA}\)를 얻는다.
+1. video depth model로 high-resolution affine-invariant depth `D_i_VDA`를 얻는다.
 2. BA depth를 unprojection하여 point cloud로 만들고, 여러 keyframe의 point cloud를 aggregate한다.
-3. pose consistency check를 통과한 point만 각 frame에 다시 project하여 sparse BA depth \(D_i^{BA}\)를 만든다.
+3. pose consistency check를 통과한 point만 각 frame에 다시 project하여 sparse BA depth `D_i_BA`를 만든다.
 4. inverse-depth 공간에서 affine alignment를 수행한다.
 
-\[
-\frac{\alpha_i}{D_i^{VDA}[u]} + \beta_i
-\approx
-\frac{1}{D_i^{BA}[u]}
-\]
+```text
+alpha_i / D_i_VDA[u] + beta_i
+  ≈ 1 / D_i_BA[u]
+```
 
 5. frame 간 scale/shift flickering을 줄이기 위해 momentum update를 적용한다.
 
-\[
-\hat{\alpha}_i = m\hat{\alpha}_{i-1} + (1-m)\alpha_i
-\]
-
-\[
-\hat{\beta}_i = m\hat{\beta}_{i-1} + (1-m)\beta_i
-\]
+```text
+alpha_hat_i = m * alpha_hat_(i-1) + (1 - m) * alpha_i
+beta_hat_i  = m * beta_hat_(i-1)  + (1 - m) * beta_i
+```
 
 6. 최종 dense depth는 다음과 같이 계산된다.
 
-\[
-D_i^{HD}
-=
-\frac{1}{\hat{\alpha}_i / D_i^{VDA} + \hat{\beta}_i}
-\]
+```text
+D_i_HD = 1 / (alpha_hat_i / D_i_VDA + beta_hat_i)
+```
 
 만약 projected BA depth coverage가 부족하면 PriorDA로 infill하고, 극단적으로 거의 coverage가 없으면 monocular metric depth estimator 결과를 fallback으로 사용한다.
 
