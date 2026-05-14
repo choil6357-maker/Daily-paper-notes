@@ -160,3 +160,4 @@
 
 ## 5. 적용 포인트
  - 3D cuboid detection을 위한 pseudo labeling 방식으로 활용가능
+ - 제공하는 3D annotation tool도 활용 가능
