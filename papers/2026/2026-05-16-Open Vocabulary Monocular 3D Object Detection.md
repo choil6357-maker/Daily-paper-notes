@@ -1,8 +1,8 @@
 # Open-Vocabulary Monocular 3D Detection
 
-- **학회:** 미확인 / 제공 본문 내 명시 없음
-- **링크:** 미확인 / 제공 본문 내 명시 없음
-- **코드:** 공개 예정 / 제공 본문 기준
+- **학회:** 3DV 2026
+- **링크:** https://arxiv.org/pdf/2411.16833
+- **코드:** https://github.com/UVA-Computer-Vision-Lab/ovmono3d
 - **분야:** Open-Vocabulary Monocular 3D Object Detection, Monocular 3D Detection, 3D Vision, Vision Foundation Model
 
 ---
