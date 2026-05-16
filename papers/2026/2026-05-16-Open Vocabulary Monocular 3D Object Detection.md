@@ -100,3 +100,4 @@
 
 ## 5. 적용 포인트
  - depth와 open-vocabulary detection을 fusion하는 mono 3D openvoca detection baseline 방법으로 참고할 만한 논문
+ - Omni3D dataset 활용 가능
